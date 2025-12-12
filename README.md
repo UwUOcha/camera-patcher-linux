@@ -1,8 +1,7 @@
-# Camera Patcher for Linux
-A utility for changing the camera distance on Linux.
+# Camera patcher for linux
+Utility for changing the camera distance on linux.
 
-## ⚠️ Предупреждение
 **Use at your own risk**.
 
-This project also has documentation in:
-- [Русский](README.ru.md)
+this project also has documentation in:
+- [русский](readme.ru.md)
