@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O2
-TARGET = dota2_patcher
+TARGET = camera_patcher
 SRC = main.cpp
 
 all: $(TARGET) fix_ptrace.sh
