@@ -3,4 +3,4 @@
 Utility for changing the camera distance on linux.
 
 This project also has documentation in:
-- [русский](README.ru.md)
+- [Русский](README.ru.md)
