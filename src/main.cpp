@@ -18,7 +18,6 @@ struct MemoryRegion {
 };
 
 class ProcessMemory {
-private:
     pid_t pid;
     int memFd;
 
@@ -34,8 +33,7 @@ public:
     bool attach(pid_t target_pid) {
         pid = target_pid;
 
-        // Открываем /proc/PID/mem напрямую
-        std::string memPath = "/proc/" + std::to_string(pid) + "/mem";
+        const std::string memPath = "/proc/" + std::to_string(pid) + "/mem";
         memFd = open(memPath.c_str(), O_RDWR);
 
         if (memFd < 0) {
@@ -54,7 +52,7 @@ public:
             return false;
         }
 
-        std::cout << "✅ Successfully opened /proc/" << pid << "/mem\n";
+        std::cout << "Successfully opened /proc/" << pid << "/mem\n";
         return true;
     }
 
@@ -111,6 +109,8 @@ public:
     }
 };
 
+bool isDebug = false;
+
 std::vector<pid_t> findProcessesByName(const std::string& processName) {
     std::vector<pid_t> pids;
     DIR* dir = opendir("/proc");
@@ -126,7 +126,6 @@ std::vector<pid_t> findProcessesByName(const std::string& processName) {
         pid_t pid = atoi(entry->d_name);
         if (pid <= 0) continue;
 
-        // Пропускаем себя и родительский процесс (sudo)
         if (pid == myPid || pid == parentPid) continue;
 
         std::string cmdlinePath = "/proc/" + std::string(entry->d_name) + "/cmdline";
@@ -136,10 +135,8 @@ std::vector<pid_t> findProcessesByName(const std::string& processName) {
         std::string cmdline;
         std::getline(cmdlineFile, cmdline);
 
-        // Пропускаем если это сам patcher
         if (cmdline.find("camera_patcher") != std::string::npos) continue;
 
-        // Ищем только реальные процессы dota2
         if (cmdline.find(processName) != std::string::npos) {
             pids.push_back(pid);
         }
@@ -184,9 +181,13 @@ void printMenu() {
     std::cout << "\n=== Camera Patcher (Direct Memory Access) ===\n";
     std::cout << "[1] Scan for camera address\n";
     std::cout << "[2] Write to specific address\n";
-    std::cout << "[3] Read from specific address\n";
-    std::cout << "[4] Set distance by offset\n";
-    std::cout << "[5] Show memory regions\n";
+
+    if (isDebug) {
+        std::cout << "[3] Read from specific address\n";
+        std::cout << "[4] Set distance by offset\n";
+        std::cout << "[5] Show memory regions\n";
+    }
+
     std::cout << "[0] Exit\n";
     std::cout << "\n=> ";
 }
@@ -204,12 +205,27 @@ void showMemoryRegions(const std::vector<MemoryRegion>& regions) {
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     std::cout << "Camera Patcher (Direct /proc/mem access)\n";
     std::cout << "================================================\n\n";
 
+    std::cout << "Arguments:" << "\n";
+
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+
+        std::cout << arg << "\n";
+
+        if (arg == "--debug") {
+            isDebug = true;
+            std::cout << "is debug";
+        }
+    }
+
+    std::cout << "\n";
+
     if (geteuid() != 0) {
-        std::cerr << "⚠️  WARNING: Not running as root!\n";
+        std::cerr << "WARNING: Not running as root!\n";
         std::cerr << "This program requires root privileges.\n";
         std::cerr << "Please run: sudo ./camera_patcher\n\n";
         return 1;
@@ -228,7 +244,6 @@ int main() {
     for (size_t i = 0; i < pids.size(); i++) {
         std::cout << "  [" << i << "] PID: " << pids[i];
 
-        // Показываем размер памяти для определения основного процесса
         std::string statusPath = "/proc/" + std::to_string(pids[i]) + "/status";
         std::ifstream statusFile(statusPath);
         if (statusFile.is_open()) {
@@ -241,12 +256,11 @@ int main() {
             }
         }
 
-        // Показываем командную строку
         std::ifstream cmdline("/proc/" + std::to_string(pids[i]) + "/cmdline");
         if (cmdline.is_open()) {
             std::string cmd;
             std::getline(cmdline, cmd);
-            // Заменяем нулевые байты на пробелы
+
             for (char& c : cmd) {
                 if (c == '\0') c = ' ';
             }
@@ -289,19 +303,16 @@ int main() {
 
     std::cout << "Looking for game modules...\n";
 
-    // Ищем различные варианты модулей
     for (const auto& region : regions) {
         bool isGameModule = false;
 
-        // Проверяем различные варианты имен
         if (region.path.find("client") != std::string::npos ||
             region.path.find("dota2") != std::string::npos ||
             region.path.find("game/bin") != std::string::npos ||
             region.path.find("libclient") != std::string::npos) {
 
-            // Показываем все найденные модули
             if (region.perms.find('w') != std::string::npos) {
-                std::cout << "  Found: " << region.path << " [" << region.perms << "]\n";
+                //std::cout << "  Found: " << region.path << " [" << region.perms << "]\n";
                 clientRegions.push_back(region);
                 isGameModule = true;
             }
@@ -312,7 +323,6 @@ int main() {
         std::cerr << "\nERROR: No writable game modules found!\n";
         std::cerr << "\nShowing all mapped files:\n";
 
-        // Показываем все регионы для отладки
         for (const auto& region : regions) {
             if (!region.path.empty() && region.path[0] == '/') {
                 std::cout << "  " << region.path << " [" << region.perms << "]\n";
@@ -323,7 +333,7 @@ int main() {
         return 1;
     }
 
-    std::cout << "\n✅ Found " << clientRegions.size() << " writable game region(s)\n";
+    std::cout << "\n Found " << clientRegions.size() << " writable game region(s)\n";
 
     int choice;
     bool running = true;
@@ -332,6 +342,8 @@ int main() {
     while (running) {
         printMenu();
         std::cin >> choice;
+
+        std::cout << "\033[2J\033[1;1H";
 
         switch (choice) {
             case 1: {
@@ -350,34 +362,30 @@ int main() {
                 }
                 break;
             }
-
             case 2: {
                 uintptr_t address;
                 float value;
 
                 if (lastFoundAddress != 0) {
-                    std::cout << "Use 0x" << std::hex << lastFoundAddress << std::dec << "? (y/n): ";
-                    char ans;
-                    std::cin >> ans;
-                    address = (ans == 'y' || ans == 'Y') ? lastFoundAddress : 0;
+                    address = lastFoundAddress;
                 }
 
                 if (address == 0) {
-                    std::cout << "Address (hex): 0x";
-                    std::cin >> std::hex >> address >> std::dec;
+                    std::cout << "No Address";
+                    //std::cin >> std::hex >> address >> std::dec;
                 }
 
                 std::cout << "Value: ";
                 std::cin >> value;
 
                 if (mem.write(address, value)) {
-                    std::cout << "✅ Written " << value << " to 0x" << std::hex << address << std::dec << std::endl;
+                    std::cout << "Written " << value << " to 0x" << std::hex << address << std::dec << std::endl;
                 } else {
-                    std::cerr << "❌ Failed\n";
+                    std::cerr << "Failed\n";
                 }
+
                 break;
             }
-
             case 3: {
                 uintptr_t address;
                 std::cout << "Address (hex): 0x";
@@ -391,7 +399,6 @@ int main() {
                 }
                 break;
             }
-
             case 4: {
                 uintptr_t baseAddr;
                 uint32_t offset;
@@ -411,14 +418,14 @@ int main() {
                 }
                 break;
             }
-
             case 5:
                 showMemoryRegions(regions);
                 break;
-
             case 0:
                 running = false;
                 break;
+            default:
+                std::cout << "Not valid key";
         }
     }
 
