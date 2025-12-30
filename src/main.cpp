@@ -9,6 +9,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <limits>
 
 struct MemoryRegion {
     uintptr_t start;
@@ -347,9 +348,18 @@ int main(int argc, char* argv[]) {
 
         switch (choice) {
             case 1: {
-                float currentDistance;
-                std::cout << "Enter CURRENT camera distance (1134-1500): ";
-                std::cin >> currentDistance;
+                float currentDistance = 1200.0f;
+                std::cout << "Enter CURRENT camera distance [1200]: ";
+
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                std::string line;
+                std::getline(std::cin, line);
+
+                if (!line.empty()) {
+                    try {
+                        currentDistance = std::stof(line);
+                    } catch (...) {}
+                }
 
                 std::cout << "\nScanning...\n";
                 for (const auto& region : clientRegions) {
