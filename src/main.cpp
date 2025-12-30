@@ -178,10 +178,13 @@ uintptr_t scanForCameraAddress(ProcessMemory& mem, const MemoryRegion& region, f
     return 0;
 }
 
-void printMenu() {
+void printMenu(bool hasAddress) {
     std::cout << "\n=== Camera Patcher (Direct Memory Access) ===\n";
     std::cout << "[1] Scan for camera address\n";
-    std::cout << "[2] Write to specific address\n";
+    
+    if (hasAddress) {
+        std::cout << "[2] Write to specific address\n";
+    }
 
     if (isDebug) {
         std::cout << "[3] Read from specific address\n";
@@ -206,7 +209,26 @@ void showMemoryRegions(const std::vector<MemoryRegion>& regions) {
     }
 }
 
+void printHelp() {
+    std::cout << "Camera Patcher (Linux)\n";
+    std::cout << "=================================\n\n";
+    std::cout << "Usage:\n";
+    std::cout << "  sudo ./camera_patcher [options]\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help   Show this help message and exit.\n";
+    std::cout << "  --debug  Enable additional debug menu options (Read, Offset, Regions).\n\n";
+}
+
 int main(int argc, char* argv[]) {
+    // Check for --help first, before printing anything else
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--help") {
+            printHelp();
+            return 0;
+        }
+    }
+
     std::cout << "Camera Patcher (Direct /proc/mem access)\n";
     std::cout << "================================================\n\n";
 
@@ -341,7 +363,7 @@ int main(int argc, char* argv[]) {
     uintptr_t lastFoundAddress = 0;
 
     while (running) {
-        printMenu();
+        printMenu(lastFoundAddress != 0);
         std::cin >> choice;
 
         std::cout << "\033[2J\033[1;1H";
@@ -373,17 +395,19 @@ int main(int argc, char* argv[]) {
                 break;
             }
             case 2: {
-                uintptr_t address;
+                if (lastFoundAddress == 0) {
+                     std::cout << "Not valid key";
+                     break;
+                }
+                uintptr_t address = lastFoundAddress;
                 float value;
 
-                if (lastFoundAddress != 0) {
-                    address = lastFoundAddress;
-                }
-
+                /*
                 if (address == 0) {
                     std::cout << "No Address";
                     //std::cin >> std::hex >> address >> std::dec;
                 }
+                */
 
                 std::cout << "Value: ";
                 std::cin >> value;
